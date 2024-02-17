@@ -61,6 +61,8 @@ export class ParserIncludes {
         await Promise.all(promises);
 
         for (const value of include) {
+            const inputs = value["inputs"] || {};
+
             if (value["rules"]) {
                 const include_rules = value["rules"];
                 const rulesResult = Utils.getRulesResult({cwd, rules: include_rules, variables: opts.variables});
@@ -71,13 +73,13 @@ export class ParserIncludes {
             if (value["local"]) {
                 const files = await globby([value["local"].replace(/^\//, ""), ...excludedGlobs], {dot: true, cwd});
                 for (const localFile of files) {
-                    const content = await Parser.loadYaml(`${cwd}/${localFile}`);
-                    excludedGlobs.push(`!${localFile}`);
+                    const content = await Parser.loadYaml(`${cwd}/${localFile}`, inputs);
+                    // excludedGlobs.push(`!${localFile}`);
                     includeDatas = includeDatas.concat(await this.init(content, depth, opts));
                 }
             } else if (value["project"]) {
                 for (const fileValue of Array.isArray(value["file"]) ? value["file"] : [value["file"]]) {
-                    const fileDoc = await Parser.loadYaml(`${cwd}/${stateDir}/includes/${gitData.remote.host}/${value["project"]}/${value["ref"] || "HEAD"}/${fileValue}`);
+                    const fileDoc = await Parser.loadYaml(`${cwd}/${stateDir}/includes/${gitData.remote.host}/${value["project"]}/${value["ref"] || "HEAD"}/${fileValue}`, inputs);
 
                     // Expand local includes inside a "project"-like include
                     fileDoc["include"] = this.expandInclude(fileDoc["include"], opts.variables);
@@ -95,11 +97,11 @@ export class ParserIncludes {
             } else if (value["template"]) {
                 const {project, ref, file, domain} = this.covertTemplateToProjectFile(value["template"]);
                 const fsUrl = Utils.fsUrl(`https://${domain}/${project}/-/raw/${ref}/${file}`);
-                const fileDoc = await Parser.loadYaml(`${cwd}/${stateDir}/includes/${fsUrl}`);
+                const fileDoc = await Parser.loadYaml(`${cwd}/${stateDir}/includes/${fsUrl}`, inputs);
                 includeDatas = includeDatas.concat(await this.init(fileDoc, depth, opts));
             } else if (value["remote"]) {
                 const fsUrl = Utils.fsUrl(value["remote"]);
-                const fileDoc = await Parser.loadYaml(`${cwd}/${stateDir}/includes/${fsUrl}`);
+                const fileDoc = await Parser.loadYaml(`${cwd}/${stateDir}/includes/${fsUrl}`, inputs);
                 includeDatas = includeDatas.concat(await this.init(fileDoc, depth, opts));
             } else {
                 throw new AssertionError({message: `Didn't understand include ${JSON.stringify(value)}`});

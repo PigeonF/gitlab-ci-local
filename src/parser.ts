@@ -187,14 +187,41 @@ export class Parser {
         });
     }
 
-    static async loadYaml (filePath: string): Promise<any> {
+    static async loadYaml (filePath: string, inputs: {[key: string]: boolean | string | number} = {}): Promise<any> {
         const ymlPath = `${filePath}`;
         if (!fs.existsSync(ymlPath)) {
             return {};
         }
 
+        const referenceType = new yaml.Type("!reference", {
+            kind: "sequence",
+            construct: function (data) {
+                return {referenceData: data};
+            },
+        });
+        const schema = yaml.DEFAULT_SCHEMA.extend([referenceType]);
         const fileContent = await fs.readFile(`${filePath}`, "utf8");
-        const fileSplit = fileContent.split(/\r?\n/g);
+        const documents = fileContent.split(/(?:\r?\n|^)---\r?\n/g);
+        const firstYaml = yaml.load(documents[0], {schema}) || {};
+        // If file begins with `---`, we have one empty document that we disregard
+        if (Object.keys(firstYaml).length === 0) {
+            documents.splice(0, 1);
+        }
+        assert(documents.length <= 2, "GitLab CI file can at most have 2 documents");
+
+        const preamble: any = documents.length == 1 ? {"spec": {"inputs": {}}} : yaml.load(documents[0]);
+        let document = documents[documents.length == 1 ? 0 : 1];
+        assert(preamble["spec"] && preamble["spec"]["inputs"],
+            "Multi-document GitLab CI file requires spec:inputs in the first document");
+        const inputSpec: {[key: string]: null | {[key: string]: string | boolean | number}} = preamble["spec"]["inputs"];
+        for (const input in inputSpec) {
+            const config = inputSpec[input] || {};
+            const value = inputs[input] || config["default"] || null;
+            assert(value !== null, `Missing value for ${input} in ${filePath}`);
+            document = document.replaceAll(`$[[ inputs.${input} ]]`, value.toString());
+        }
+
+        const fileSplit = document.split(/\r?\n/g);
         const fileSplitClone = fileSplit.slice();
 
         let interactiveMatch = null;
@@ -234,13 +261,6 @@ export class Parser {
             index++;
         }
 
-        const referenceType = new yaml.Type("!reference", {
-            kind: "sequence",
-            construct: function (data) {
-                return {referenceData: data};
-            },
-        });
-        const schema = yaml.DEFAULT_SCHEMA.extend([referenceType]);
         return yaml.load(fileSplitClone.join("\n"), {schema}) || {};
     }
 
