@@ -1,0 +1,9 @@
+spec:
+  inputs:
+    name:
+      default: job-with-default-name
+---
+"$[[ inputs.name ]]":
+  stage: build
+  script:
+    - echo "Hello, World"

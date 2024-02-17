@@ -1,0 +1,13 @@
+# Some comments
+
+# Some more comments
+---
+include:
+  - local: template.yml
+    inputs:
+      name: hello-world
+  - local: template.yml
+    inputs:
+      name: hello-gcl
+      greeting: GCL
+  - local: template-with-defaults.yml

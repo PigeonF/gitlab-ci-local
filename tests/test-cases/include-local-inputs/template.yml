@@ -1,0 +1,11 @@
+spec:
+  inputs:
+    name:
+    greeting:
+      default: World
+---
+"$[[ inputs.name ]]":
+  stage: build
+  script:
+    - echo "Hello, $[[ inputs.greeting ]]"
+    - echo "How are you $[[ inputs.greeting ]]?"
